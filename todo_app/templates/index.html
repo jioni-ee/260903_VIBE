@@ -96,12 +96,6 @@
                 <div class="calendar-days-grid" id="calendarDaysGrid">
                     <!-- Days generated dynamically via JS -->
                 </div>
-                <div class="calendar-filter-indicator" id="calendarFilterIndicator" style="display: none;">
-                    <span><i class="fa-solid fa-filter"></i> <strong id="filterDateDisplay">2026-09-04</strong> 날짜로 필터링 중</span>
-                    <button type="button" id="btnClearDateFilter" class="btn-clear-date-filter">
-                        <i class="fa-solid fa-xmark"></i> 전체 보기로 초기화
-                    </button>
-                </div>
             </div>
 
             <!-- Floating Day Details Popover (Full items overlay) -->
@@ -264,16 +258,27 @@
                     </div>
 
                     <div class="toolbar-controls">
-                        <div class="status-tabs" id="statusTabs">
-                            <button type="button" class="tab-btn active" data-filter="all" title="더블클릭: '오늘' 날짜 필터 토글">
-                                전체 <span class="tab-count" id="countAll">0</span>
-                            </button>
-                            <button type="button" class="tab-btn" data-filter="active" title="더블클릭: '오늘' 날짜 필터 토글">
-                                진행 중 <span class="tab-count" id="countActive">0</span>
-                            </button>
-                            <button type="button" class="tab-btn" data-filter="completed" title="더블클릭: '오늘' 날짜 필터 토글">
-                                완료됨 <span class="tab-count" id="countCompleted">0</span>
-                            </button>
+                        <div class="toolbar-left-group">
+                            <div class="status-tabs" id="statusTabs">
+                                <button type="button" class="tab-btn active" data-filter="all" title="더블클릭: '오늘' 날짜 필터 토글">
+                                    전체 <span class="tab-count" id="countAll">0</span>
+                                </button>
+                                <button type="button" class="tab-btn" data-filter="active" title="더블클릭: '오늘' 날짜 필터 토글">
+                                    진행 중 <span class="tab-count" id="countActive">0</span>
+                                </button>
+                                <button type="button" class="tab-btn" data-filter="completed" title="더블클릭: '오늘' 날짜 필터 토글">
+                                    완료됨 <span class="tab-count" id="countCompleted">0</span>
+                                </button>
+                            </div>
+
+                            <!-- 날짜 필터링 안내 칩 (전체/진행중/완료됨 탭 바로 옆) -->
+                            <div class="toolbar-date-filter-chip" id="calendarFilterIndicator" style="display: none;">
+                                <i class="fa-regular fa-calendar-check"></i>
+                                <span><strong id="filterDateDisplay">2026-09-04</strong> 마감 필터</span>
+                                <button type="button" id="btnClearDateFilter" class="btn-clear-chip" title="날짜 필터 해제">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <div class="dropdown-controls">

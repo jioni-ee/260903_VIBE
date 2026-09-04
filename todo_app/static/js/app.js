@@ -212,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 캘린더 접기/펼치기 토글 함수
         function toggleCalendarCollapse(force) {
+            hideDayPopover();
             if (typeof force === 'boolean') {
                 state.calendarCollapsed = force;
             } else {
@@ -780,22 +781,82 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // 팝오버 위치 계산 (뷰포트 오버플로 방지)
-        const rect = cell.getBoundingClientRect();
-        const popoverWidth = 320;
-        const popoverHeight = 320;
+        // 팝오버 위치 계산 (달력 영역 내부, 해당 일자칸 바로 옆 상/하/좌/우 자동 배치)
+        if (!elements.calendarSection) return;
 
-        let left = rect.left + (rect.width / 2) - (popoverWidth / 2);
-        left = Math.max(12, Math.min(window.innerWidth - popoverWidth - 12, left));
+        // 실제 렌더링된 크기 측정을 위해 임시 표시
+        elements.calDayPopover.style.visibility = 'hidden';
+        elements.calDayPopover.style.display = 'flex';
 
-        let top = rect.bottom + 8;
-        if (top + popoverHeight > window.innerHeight) {
-            top = Math.max(10, rect.top - popoverHeight - 8);
+        const calRect = elements.calendarSection.getBoundingClientRect();
+        const cellRect = cell.getBoundingClientRect();
+        const popRect = elements.calDayPopover.getBoundingClientRect();
+
+        const popWidth = popRect.width || 300;
+        const popHeight = popRect.height || 280;
+
+        const pad = 10; // 달력 외곽 안전 여백
+        const gap = 8;  // 일자칸과의 간격
+
+        // 달력 내 일자칸의 상대 좌표
+        const cLeft = cellRect.left - calRect.left;
+        const cRight = cellRect.right - calRect.left;
+        const cTop = cellRect.top - calRect.top;
+        const cBottom = cellRect.bottom - calRect.top;
+
+        // 달력 헤더 아래부터 배치 가능하도록 최소/최대 Y 계산
+        const calHeader = elements.calendarSection.querySelector('.calendar-header');
+        const minTop = calHeader ? (calHeader.getBoundingClientRect().bottom - calRect.top + 6) : pad;
+        const maxTop = Math.max(minTop, calRect.height - popHeight - pad);
+
+        let left = 0;
+        let top = 0;
+
+        // 좌/우 공간 확인
+        const spaceRight = calRect.width - cRight - pad;
+        const spaceLeft = cLeft - pad;
+
+        if (spaceRight >= popWidth + gap) {
+            // 1. 우측 배치: 일자칸 바로 오른쪽
+            left = cRight + gap;
+            top = cTop;
+            // 상하 위치 보정: 달력 하단을 벗어날 경우 위로 이동하여 셀 하단에 맞춤
+            if (top + popHeight > calRect.height - pad) {
+                top = Math.max(minTop, cBottom - popHeight);
+            }
+        } else if (spaceLeft >= popWidth + gap) {
+            // 2. 좌측 배치: 일자칸 바로 왼쪽
+            left = cLeft - popWidth - gap;
+            top = cTop;
+            // 상하 위치 보정: 달력 하단을 벗어날 경우 위로 이동하여 셀 하단에 맞춤
+            if (top + popHeight > calRect.height - pad) {
+                top = Math.max(minTop, cBottom - popHeight);
+            }
+        } else {
+            // 3. 좌우 공간 부족 시(화면이 좁은 모바일 등): 상/하 배치로 자동 전환
+            left = Math.max(pad, Math.min(calRect.width - popWidth - pad, cLeft + (cellRect.width - popWidth) / 2));
+
+            const spaceBottom = calRect.height - cBottom - pad;
+            const spaceTop = cTop - minTop;
+
+            if (spaceBottom >= popHeight + gap) {
+                // 하단 배치
+                top = cBottom + gap;
+            } else if (spaceTop >= popHeight + gap) {
+                // 상단 배치
+                top = cTop - popHeight - gap;
+            } else {
+                top = Math.max(minTop, Math.min(maxTop, cTop));
+            }
         }
 
-        elements.calDayPopover.style.left = `${left}px`;
-        elements.calDayPopover.style.top = `${top}px`;
-        elements.calDayPopover.style.display = 'flex';
+        // 최종 달력 영역 클램프 (달력 경계를 절대 벗어나지 않도록 보장)
+        left = Math.max(pad, Math.min(calRect.width - popWidth - pad, left));
+        top = Math.max(minTop, Math.min(maxTop, top));
+
+        elements.calDayPopover.style.left = `${Math.round(left)}px`;
+        elements.calDayPopover.style.top = `${Math.round(top)}px`;
+        elements.calDayPopover.style.visibility = 'visible';
     }
 
     function hideDayPopover() {
