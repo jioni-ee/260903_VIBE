@@ -386,6 +386,31 @@ body {
     min-height: 60px;
 }
 
+.form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.9rem;
+}
+
+.align-center {
+    align-items: center;
+}
+
+.conditional-field {
+    animation: fadeInField 0.25s ease-out;
+}
+
+@keyframes fadeInField {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .form-row-3 {
     display: grid;
     grid-template-columns: 1fr;
@@ -450,6 +475,27 @@ body {
 .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.15);
     color: var(--text-primary);
+}
+
+.btn-danger {
+    background: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: var(--radius-sm);
+    padding: 0.8rem 1.25rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: var(--transition-fast);
+}
+
+.btn-danger:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
 }
 
 /* List Section & Toolbar */
@@ -757,6 +803,16 @@ body {
     font-weight: 600;
 }
 
+.badge-assignee {
+    background: rgba(99, 102, 241, 0.16);
+    color: #c7d2fe;
+    border: 1px solid rgba(99, 102, 241, 0.35);
+}
+
+.badge-assignee i {
+    color: #a5b4fc;
+}
+
 /* Action Buttons */
 .todo-actions {
     display: flex;
@@ -913,6 +969,77 @@ body {
     margin-top: 1rem;
 }
 
+/* Schedule Modal Specifics */
+.custom-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    padding-top: 1.2rem;
+}
+
+.custom-checkbox-label input[type="checkbox"] {
+    display: none;
+}
+
+.custom-checkbox-label .custom-check-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    background: var(--bg-input);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    font-size: 0.72rem;
+    transition: var(--transition-fast);
+}
+
+.custom-checkbox-label input[type="checkbox"]:checked + .custom-check-box {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #ffffff;
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.color-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    height: 42px;
+}
+
+.color-option {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+}
+
+.color-option input[type="radio"] {
+    display: none;
+}
+
+.color-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: inline-block;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+    border: 2px solid transparent;
+}
+
+.color-option input[type="radio"]:checked + .color-dot {
+    transform: scale(1.25);
+    border-color: #ffffff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.45);
+}
+
 /* Toast Notification */
 .toast-container {
     position: fixed;
@@ -1026,6 +1153,7 @@ body {
     border-radius: 50%;
 }
 
+.dot-schedule { background: #8b5cf6; box-shadow: 0 0 6px rgba(139, 92, 246, 0.7); }
 .dot-high { background: #ef4444; box-shadow: 0 0 6px rgba(239, 68, 68, 0.6); }
 .dot-medium { background: #f59e0b; box-shadow: 0 0 6px rgba(245, 158, 11, 0.6); }
 .dot-low { background: #10b981; box-shadow: 0 0 6px rgba(16, 185, 129, 0.6); }
@@ -1050,6 +1178,31 @@ body {
     display: flex;
     align-items: center;
     gap: 0.6rem;
+}
+
+.btn-cal-add {
+    background: var(--primary-gradient);
+    border: none;
+    color: #ffffff;
+    padding: 0.42rem 0.9rem;
+    border-radius: var(--radius-full);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: var(--transition-normal);
+    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.35);
+}
+
+.btn-cal-add:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.55);
+}
+
+.btn-cal-add:active {
+    transform: translateY(0);
 }
 
 .calendar-nav-group {
@@ -1251,6 +1404,34 @@ body {
     flex-direction: column;
     gap: 3px;
     overflow: hidden;
+}
+
+.cal-schedule-chip {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    transition: var(--transition-fast);
+    line-height: 1.2;
+    cursor: pointer;
+    font-weight: 500;
+    color: #ffffff;
+}
+
+.cal-schedule-chip:hover {
+    filter: brightness(1.25);
+    transform: translateX(1px);
+}
+
+.cal-schedule-time {
+    font-size: 0.65rem;
+    opacity: 0.9;
+    font-weight: 600;
 }
 
 .cal-task-chip {

@@ -55,6 +55,7 @@
                 </div>
                 
                 <div class="calendar-legend">
+                    <span class="legend-item"><span class="legend-dot dot-schedule"></span>일정</span>
                     <span class="legend-item"><span class="legend-dot dot-high"></span>긴급</span>
                     <span class="legend-item"><span class="legend-dot dot-medium"></span>보통</span>
                     <span class="legend-item"><span class="legend-dot dot-low"></span>낮음</span>
@@ -62,6 +63,10 @@
                 </div>
 
                 <div class="calendar-actions">
+                    <button type="button" class="btn-cal-add" id="btnAddScheduleBtn" title="달력에 새 일정 등록">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                        <span>일정 추가</span>
+                    </button>
                     <div class="calendar-nav-group" id="calendarNavGroup">
                         <button type="button" class="btn-cal-nav" id="calPrevMonthBtn" title="이전 달">
                             <i class="fa-solid fa-chevron-left"></i>
@@ -207,6 +212,15 @@
                             </div>
                         </div>
 
+                        <!-- 업무 / 개발 선택 시 동적으로 나타나는 담당자 입력칸 -->
+                        <div class="input-group conditional-field" id="todoAssigneeGroup" style="display: none;">
+                            <label for="todoAssignee"><i class="fa-solid fa-user-tag"></i> 담당자 (업무/개발 전용)</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-user-check input-icon"></i>
+                                <input type="text" id="todoAssignee" placeholder="담당자 이름 (예: 홍길동, 김개발)" autocomplete="off">
+                            </div>
+                        </div>
+
                         <button type="submit" class="btn-primary" id="btnSubmitTodo">
                             <i class="fa-solid fa-plus"></i> 할 일 추가하기
                         </button>
@@ -345,10 +359,130 @@
                     </div>
                 </div>
 
+                <!-- 수정 모달 담당자 필드 -->
+                <div class="input-group conditional-field" id="editTodoAssigneeGroup" style="display: none;">
+                    <label for="editTodoAssignee"><i class="fa-solid fa-user-tag"></i> 담당자 (업무/개발 전용)</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-user-check input-icon"></i>
+                        <input type="text" id="editTodoAssignee" placeholder="담당자 이름">
+                    </div>
+                </div>
+
                 <div class="modal-footer">
                     <button type="button" class="btn-secondary" id="btnCancelEdit">취소</button>
                     <button type="submit" class="btn-primary" id="btnSaveEdit">
                         <i class="fa-solid fa-check"></i> 변경사항 저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Schedule Modal (Add/Edit Calendar Events) -->
+    <div class="modal-backdrop" id="scheduleModalBackdrop">
+        <div class="glass-card modal-content">
+            <div class="modal-header">
+                <h3 id="scheduleModalTitle"><i class="fa-solid fa-calendar-plus"></i> 새 일정 등록</h3>
+                <button type="button" class="btn-close-modal" id="btnCloseScheduleModal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="scheduleForm" class="todo-form">
+                <input type="hidden" id="scheduleId">
+
+                <div class="input-group">
+                    <label for="scheduleTitle">일정 제목 <span class="required">*</span></label>
+                    <div class="input-wrapper">
+                        <i class="fa-regular fa-calendar-check input-icon"></i>
+                        <input type="text" id="scheduleTitle" placeholder="어떤 일정인가요? (예: 주간 회의, 고객 미팅)" required autocomplete="off">
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="input-group">
+                        <label for="scheduleStartDate">시작 날짜 <span class="required">*</span></label>
+                        <div class="input-wrapper">
+                            <i class="fa-regular fa-calendar input-icon"></i>
+                            <input type="date" id="scheduleStartDate" required>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="scheduleEndDate">종료 날짜</label>
+                        <div class="input-wrapper">
+                            <i class="fa-regular fa-calendar input-icon"></i>
+                            <input type="date" id="scheduleEndDate">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row-2 align-center">
+                    <div class="input-group">
+                        <label class="custom-checkbox-label">
+                            <input type="checkbox" id="scheduleIsAllDay" checked>
+                            <span class="custom-check-box"><i class="fa-solid fa-check"></i></span>
+                            <span>종일(All-day) 일정</span>
+                        </label>
+                    </div>
+                    <div class="input-group" id="scheduleTimeGroup" style="display: none;">
+                        <label for="scheduleStartTime">시작 시간</label>
+                        <div class="input-wrapper">
+                            <i class="fa-regular fa-clock input-icon"></i>
+                            <input type="time" id="scheduleStartTime">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row-2">
+                    <div class="input-group">
+                        <label for="scheduleCategory">일정 구분</label>
+                        <div class="input-wrapper select-wrapper">
+                            <select id="scheduleCategory">
+                                <option value="회의">회의 👥</option>
+                                <option value="약속">약속 🤝</option>
+                                <option value="외근">외근/출장 🚗</option>
+                                <option value="기념일">기념일 🎂</option>
+                                <option value="행사">행사/이벤트 🎉</option>
+                                <option value="기타">기타 📌</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label>라벨 색상</label>
+                        <div class="color-picker-row" id="colorPickerRow">
+                            <label class="color-option"><input type="radio" name="scheduleColor" value="#6366f1" checked><span class="color-dot" style="background:#6366f1;"></span></label>
+                            <label class="color-option"><input type="radio" name="scheduleColor" value="#06b6d4"><span class="color-dot" style="background:#06b6d4;"></span></label>
+                            <label class="color-option"><input type="radio" name="scheduleColor" value="#10b981"><span class="color-dot" style="background:#10b981;"></span></label>
+                            <label class="color-option"><input type="radio" name="scheduleColor" value="#f59e0b"><span class="color-dot" style="background:#f59e0b;"></span></label>
+                            <label class="color-option"><input type="radio" name="scheduleColor" value="#ef4444"><span class="color-dot" style="background:#ef4444;"></span></label>
+                            <label class="color-option"><input type="radio" name="scheduleColor" value="#8b5cf6"><span class="color-dot" style="background:#8b5cf6;"></span></label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="scheduleLocation">장소 / 링크 (선택)</label>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-location-dot input-icon"></i>
+                        <input type="text" id="scheduleLocation" placeholder="예: 대회의실 A 또는 온라인 줌 링크">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="scheduleDescription">상세 메모 (선택)</label>
+                    <div class="input-wrapper textarea-wrapper">
+                        <i class="fa-regular fa-file-lines input-icon"></i>
+                        <textarea id="scheduleDescription" rows="2" placeholder="일정 관련 참고사항 메모"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-danger" id="btnDeleteSchedule" style="display: none;">
+                        <i class="fa-regular fa-trash-can"></i> 삭제
+                    </button>
+                    <div style="flex: 1;"></div>
+                    <button type="button" class="btn-secondary" id="btnCancelSchedule">취소</button>
+                    <button type="submit" class="btn-primary" id="btnSaveSchedule">
+                        <i class="fa-solid fa-check"></i> 저장하기
                     </button>
                 </div>
             </form>

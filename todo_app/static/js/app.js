@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sortBy: 'created_desc',
         todos: [],
         allTodos: [],
+        schedules: [],
         calendarDate: new Date(),
         selectedDate: null,
         calendarCollapsed: false
@@ -53,6 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
         todoCategory: document.getElementById('todoCategory'),
         todoPriority: document.getElementById('todoPriority'),
         todoDueDate: document.getElementById('todoDueDate'),
+        todoAssigneeGroup: document.getElementById('todoAssigneeGroup'),
+        todoAssignee: document.getElementById('todoAssignee'),
 
         // Controls
         statusTabs: document.getElementById('statusTabs'),
@@ -64,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sortBy: document.getElementById('sortBy'),
         todoListContainer: document.getElementById('todoListContainer'),
 
-        // Modal
+        // Modal (Todo Edit)
         editModalBackdrop: document.getElementById('editModalBackdrop'),
         editTodoForm: document.getElementById('editTodoForm'),
         editTodoId: document.getElementById('editTodoId'),
@@ -73,8 +76,30 @@ document.addEventListener('DOMContentLoaded', () => {
         editTodoCategory: document.getElementById('editTodoCategory'),
         editTodoPriority: document.getElementById('editTodoPriority'),
         editTodoDueDate: document.getElementById('editTodoDueDate'),
+        editTodoAssigneeGroup: document.getElementById('editTodoAssigneeGroup'),
+        editTodoAssignee: document.getElementById('editTodoAssignee'),
         btnCloseModal: document.getElementById('btnCloseModal'),
         btnCancelEdit: document.getElementById('btnCancelEdit'),
+
+        // Schedule Elements & Modal
+        btnAddScheduleBtn: document.getElementById('btnAddScheduleBtn'),
+        scheduleModalBackdrop: document.getElementById('scheduleModalBackdrop'),
+        scheduleModalTitle: document.getElementById('scheduleModalTitle'),
+        scheduleForm: document.getElementById('scheduleForm'),
+        scheduleId: document.getElementById('scheduleId'),
+        scheduleTitle: document.getElementById('scheduleTitle'),
+        scheduleStartDate: document.getElementById('scheduleStartDate'),
+        scheduleEndDate: document.getElementById('scheduleEndDate'),
+        scheduleIsAllDay: document.getElementById('scheduleIsAllDay'),
+        scheduleTimeGroup: document.getElementById('scheduleTimeGroup'),
+        scheduleStartTime: document.getElementById('scheduleStartTime'),
+        scheduleCategory: document.getElementById('scheduleCategory'),
+        scheduleColorInputs: document.querySelectorAll('input[name="scheduleColor"]'),
+        scheduleLocation: document.getElementById('scheduleLocation'),
+        scheduleDescription: document.getElementById('scheduleDescription'),
+        btnCloseScheduleModal: document.getElementById('btnCloseScheduleModal'),
+        btnCancelSchedule: document.getElementById('btnCancelSchedule'),
+        btnDeleteSchedule: document.getElementById('btnDeleteSchedule'),
 
         // Toast
         toastContainer: document.getElementById('toastContainer')
@@ -202,23 +227,91 @@ document.addEventListener('DOMContentLoaded', () => {
             clearDateFilter();
         });
 
-        // Modal Events
+        // Todo Edit Modal Events
         elements.btnCloseModal.addEventListener('click', closeModal);
         elements.btnCancelEdit.addEventListener('click', closeModal);
         elements.editModalBackdrop.addEventListener('click', (e) => {
             if (e.target === elements.editModalBackdrop) closeModal();
         });
+        elements.editTodoForm.addEventListener('submit', handleSaveEdit);
+
+        // Schedule Modal Events
+        if (elements.btnAddScheduleBtn) {
+            elements.btnAddScheduleBtn.addEventListener('click', () => {
+                openScheduleModal(null, state.selectedDate || getTodayString());
+            });
+        }
+
+        if (elements.scheduleIsAllDay) {
+            elements.scheduleIsAllDay.addEventListener('change', () => {
+                elements.scheduleTimeGroup.style.display = elements.scheduleIsAllDay.checked ? 'none' : 'block';
+            });
+        }
+
+        if (elements.btnCloseScheduleModal) elements.btnCloseScheduleModal.addEventListener('click', closeScheduleModal);
+        if (elements.btnCancelSchedule) elements.btnCancelSchedule.addEventListener('click', closeScheduleModal);
+        if (elements.scheduleModalBackdrop) {
+            elements.scheduleModalBackdrop.addEventListener('click', (e) => {
+                if (e.target === elements.scheduleModalBackdrop) closeScheduleModal();
+            });
+        }
+        if (elements.scheduleForm) elements.scheduleForm.addEventListener('submit', handleSaveSchedule);
+        if (elements.btnDeleteSchedule) elements.btnDeleteSchedule.addEventListener('click', handleDeleteSchedule);
+
+        // Assignee Field Dynamic Display Listeners
+        if (elements.todoCategory && elements.todoAssigneeGroup) {
+            elements.todoCategory.addEventListener('change', () => {
+                updateAssigneeVisibility(elements.todoCategory, elements.todoAssigneeGroup);
+            });
+            updateAssigneeVisibility(elements.todoCategory, elements.todoAssigneeGroup);
+        }
+
+        if (elements.editTodoCategory && elements.editTodoAssigneeGroup) {
+            elements.editTodoCategory.addEventListener('change', () => {
+                updateAssigneeVisibility(elements.editTodoCategory, elements.editTodoAssigneeGroup);
+            });
+        }
+
+        // Global Keydown (Escape closes open modal)
         window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && elements.editModalBackdrop.classList.contains('show')) {
-                closeModal();
+            if (e.key === 'Escape') {
+                if (elements.editModalBackdrop && elements.editModalBackdrop.classList.contains('show')) {
+                    closeModal();
+                }
+                if (elements.scheduleModalBackdrop && elements.scheduleModalBackdrop.classList.contains('show')) {
+                    closeScheduleModal();
+                }
             }
         });
-        elements.editTodoForm.addEventListener('submit', handleSaveEdit);
+    }
+
+    // Helper: Dynamic Assignee Visibility
+    function updateAssigneeVisibility(categorySelect, assigneeGroup) {
+        if (!categorySelect || !assigneeGroup) return;
+        const cat = categorySelect.value;
+        if (cat === '업무' || cat === '개발') {
+            assigneeGroup.style.display = 'block';
+        } else {
+            assigneeGroup.style.display = 'none';
+        }
     }
 
     // API Calls
     async function loadAll() {
-        await Promise.all([fetchAllTodosForCalendar(), fetchTodos(), fetchStats()]);
+        await Promise.all([fetchAllTodosForCalendar(), fetchTodos(), fetchStats(), fetchSchedules()]);
+    }
+
+    async function fetchSchedules() {
+        try {
+            const res = await fetch('/api/schedules');
+            const data = await res.json();
+            if (data.success) {
+                state.schedules = data.schedules;
+                renderCalendar();
+            }
+        } catch (err) {
+            console.error('Schedule fetch error:', err);
+        }
     }
 
     async function fetchAllTodosForCalendar() {
@@ -285,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 지난 달 마지막 날짜
         const prevLastDate = new Date(year, month, 0).getDate();
 
-        // 기한별 할 일 맵 생성: { 'YYYY-MM-DD': [todo1, todo2, ...] }
+        // 1. 기한별 할 일 맵 생성: { 'YYYY-MM-DD': [todo1, todo2, ...] }
         const todosByDate = {};
         state.allTodos.forEach(todo => {
             if (todo.due_date) {
@@ -293,6 +386,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     todosByDate[todo.due_date] = [];
                 }
                 todosByDate[todo.due_date].push(todo);
+            }
+        });
+
+        // 2. 날짜별 일정(Schedule) 맵 생성: { 'YYYY-MM-DD': [sched1, sched2, ...] }
+        const schedulesByDate = {};
+        state.schedules.forEach(sc => {
+            if (sc.start_date) {
+                const start = sc.start_date;
+                const end = sc.end_date || sc.start_date;
+                let cur = new Date(start + 'T00:00:00');
+                const endDate = new Date(end + 'T00:00:00');
+                let safety = 0;
+                while (cur <= endDate && safety < 60) {
+                    const dStr = formatDate(cur);
+                    if (!schedulesByDate[dStr]) schedulesByDate[dStr] = [];
+                    schedulesByDate[dStr].push(sc);
+                    cur.setDate(cur.getDate() + 1);
+                    safety++;
+                }
             }
         });
 
@@ -304,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dayNum = prevLastDate - i + 1;
             const prevMonthDate = new Date(year, month - 1, dayNum);
             const dateStr = formatDate(prevMonthDate);
-            daysHtml += createDayCellHtml(dateStr, dayNum, true, false, todosByDate[dateStr] || []);
+            daysHtml += createDayCellHtml(dateStr, dayNum, true, false, todosByDate[dateStr] || [], schedulesByDate[dateStr] || []);
         }
 
         // 2. 이번 달 날짜들
@@ -313,7 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dateStr = formatDate(currDate);
             const isToday = (dateStr === todayStr);
             const isSelected = (dateStr === state.selectedDate);
-            daysHtml += createDayCellHtml(dateStr, dayNum, false, isToday, todosByDate[dateStr] || [], isSelected);
+            daysHtml += createDayCellHtml(dateStr, dayNum, false, isToday, todosByDate[dateStr] || [], schedulesByDate[dateStr] || [], isSelected);
         }
 
         // 3. 다음 달 채우기 (총 35 or 42 셀 유지)
@@ -324,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let dayNum = 1; dayNum <= remainingSlots; dayNum++) {
             const nextMonthDate = new Date(year, month + 1, dayNum);
             const dateStr = formatDate(nextMonthDate);
-            daysHtml += createDayCellHtml(dateStr, dayNum, true, false, todosByDate[dateStr] || []);
+            daysHtml += createDayCellHtml(dateStr, dayNum, true, false, todosByDate[dateStr] || [], schedulesByDate[dateStr] || []);
         }
 
         elements.calendarDaysGrid.innerHTML = daysHtml;
@@ -336,9 +448,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 handleDateCellClick(dateStr);
             });
         });
+
+        // 일정 칩 클릭 시 수정 모달 오픈 (상위 날짜 셀 클릭 전파 방지)
+        elements.calendarDaysGrid.querySelectorAll('.cal-schedule-chip').forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const schedId = chip.dataset.scheduleId;
+                const schedule = state.schedules.find(s => s.id == schedId);
+                if (schedule) {
+                    openScheduleModal(schedule);
+                }
+            });
+        });
     }
 
-    function createDayCellHtml(dateStr, dayNum, isOtherMonth, isToday, tasksForDay, isSelected = false) {
+    function createDayCellHtml(dateStr, dayNum, isOtherMonth, isToday, tasksForDay, schedulesForDay = [], isSelected = false) {
         const d = new Date(dateStr);
         const dayOfWeek = d.getDay();
         let dayClass = 'cal-day-cell';
@@ -348,26 +472,42 @@ document.addEventListener('DOMContentLoaded', () => {
         if (dayOfWeek === 0) dayClass += ' is-sunday';
         if (dayOfWeek === 6) dayClass += ' is-saturday';
 
-        const taskCount = tasksForDay.length;
-        const countBadge = taskCount > 0 ? `<span class="cal-task-count-badge">${taskCount}건</span>` : '';
+        const totalItemsCount = tasksForDay.length + schedulesForDay.length;
+        const countBadge = totalItemsCount > 0 ? `<span class="cal-task-count-badge">${totalItemsCount}건</span>` : '';
 
-        // 최대 2개 칩 렌더링
-        let tasksHtml = '';
-        if (taskCount > 0) {
-            const displayTasks = tasksForDay.slice(0, 2);
-            displayTasks.forEach(t => {
-                const isCompleted = t.completed === 1;
-                const chipClass = isCompleted ? 'chip-completed' : `chip-${t.priority}`;
-                tasksHtml += `
-                    <div class="cal-task-chip ${chipClass}" title="${escapeHtml(t.title)} (${t.priority})">
-                        ${isCompleted ? '<i class="fa-solid fa-check"></i> ' : ''}${escapeHtml(t.title)}
-                    </div>
-                `;
-            });
+        // 최대 2개 아이템 표시 (일정 우선, 이후 할 일)
+        let chipsHtml = '';
+        let displayedCount = 0;
+        const maxDisplay = 2;
 
-            if (taskCount > 2) {
-                tasksHtml += `<div class="cal-more-chip">+${taskCount - 2}건 더보기</div>`;
-            }
+        // 1. 일정 칩 표시
+        for (const sc of schedulesForDay) {
+            if (displayedCount >= maxDisplay) break;
+            const color = sc.color || '#6366f1';
+            const timeStr = (!sc.is_all_day && sc.start_time) ? `<span class="cal-schedule-time">${escapeHtml(sc.start_time)}</span>` : '';
+            chipsHtml += `
+                <div class="cal-schedule-chip" style="background: ${color};" data-schedule-id="${sc.id}" title="[일정: ${escapeHtml(sc.category || '기본')}] ${escapeHtml(sc.title)}${sc.location ? ' @ ' + escapeHtml(sc.location) : ''}">
+                    <i class="fa-solid fa-calendar-day"></i> ${timeStr}${escapeHtml(sc.title)}
+                </div>
+            `;
+            displayedCount++;
+        }
+
+        // 2. 할 일 칩 표시
+        for (const t of tasksForDay) {
+            if (displayedCount >= maxDisplay) break;
+            const isCompleted = t.completed === 1;
+            const chipClass = isCompleted ? 'chip-completed' : `chip-${t.priority}`;
+            chipsHtml += `
+                <div class="cal-task-chip ${chipClass}" title="[할일] ${escapeHtml(t.title)} (${t.priority})">
+                    ${isCompleted ? '<i class="fa-solid fa-check"></i> ' : ''}${escapeHtml(t.title)}
+                </div>
+            `;
+            displayedCount++;
+        }
+
+        if (totalItemsCount > maxDisplay) {
+            chipsHtml += `<div class="cal-more-chip">+${totalItemsCount - maxDisplay}건 더보기</div>`;
         }
 
         return `
@@ -377,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${countBadge}
                 </div>
                 <div class="cal-tasks-wrap">
-                    ${tasksHtml}
+                    ${chipsHtml}
                 </div>
             </div>
         `;
@@ -424,12 +564,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = elements.todoTitle.value.trim();
         if (!title) return;
 
+        const category = elements.todoCategory.value;
+        const assignee = (category === '업무' || category === '개발')
+            ? elements.todoAssignee.value.trim()
+            : '';
+
         const payload = {
             title: title,
             description: elements.todoDescription.value.trim(),
-            category: elements.todoCategory.value,
+            category: category,
             priority: elements.todoPriority.value,
-            due_date: elements.todoDueDate.value || null
+            due_date: elements.todoDueDate.value || null,
+            assignee: assignee
         };
 
         try {
@@ -445,6 +591,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.addTodoForm.reset();
                 elements.todoCategory.value = '일반';
                 elements.todoPriority.value = 'medium';
+                elements.todoAssignee.value = '';
+                updateAssigneeVisibility(elements.todoCategory, elements.todoAssigneeGroup);
                 await loadAll();
             } else {
                 showToast(data.message || '추가에 실패했습니다.', 'error');
@@ -502,7 +650,9 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.editTodoCategory.value = todo.category || '일반';
         elements.editTodoPriority.value = todo.priority || 'medium';
         elements.editTodoDueDate.value = todo.due_date || '';
+        elements.editTodoAssignee.value = todo.assignee || '';
 
+        updateAssigneeVisibility(elements.editTodoCategory, elements.editTodoAssigneeGroup);
         elements.editModalBackdrop.classList.add('show');
     }
 
@@ -517,12 +667,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = elements.editTodoTitle.value.trim();
         if (!title) return;
 
+        const category = elements.editTodoCategory.value;
+        const assignee = (category === '업무' || category === '개발')
+            ? elements.editTodoAssignee.value.trim()
+            : '';
+
         const payload = {
             title: title,
             description: elements.editTodoDescription.value.trim(),
-            category: elements.editTodoCategory.value,
+            category: category,
             priority: elements.editTodoPriority.value,
-            due_date: elements.editTodoDueDate.value || null
+            due_date: elements.editTodoDueDate.value || null,
+            assignee: assignee
         };
 
         try {
@@ -542,6 +698,131 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error(err);
             showToast('수정 처리 중 오류가 발생했습니다.', 'error');
+        }
+    }
+
+    // Schedule Modal Operations
+    function openScheduleModal(schedule = null, defaultDate = null) {
+        elements.scheduleForm.reset();
+        if (schedule) {
+            elements.scheduleModalTitle.innerHTML = '<i class="fa-solid fa-calendar-check"></i> 일정 수정';
+            elements.scheduleId.value = schedule.id;
+            elements.scheduleTitle.value = schedule.title;
+            elements.scheduleStartDate.value = schedule.start_date || '';
+            elements.scheduleEndDate.value = schedule.end_date || '';
+            elements.scheduleIsAllDay.checked = Boolean(schedule.is_all_day);
+            elements.scheduleTimeGroup.style.display = schedule.is_all_day ? 'none' : 'block';
+            elements.scheduleStartTime.value = schedule.start_time || '';
+            elements.scheduleCategory.value = schedule.category || '회의';
+            elements.scheduleLocation.value = schedule.location || '';
+            elements.scheduleDescription.value = schedule.description || '';
+
+            elements.scheduleColorInputs.forEach(radio => {
+                radio.checked = (radio.value === (schedule.color || '#6366f1'));
+            });
+
+            elements.btnDeleteSchedule.style.display = 'inline-flex';
+        } else {
+            elements.scheduleModalTitle.innerHTML = '<i class="fa-solid fa-calendar-plus"></i> 새 일정 등록';
+            elements.scheduleId.value = '';
+            elements.scheduleStartDate.value = defaultDate || getTodayString();
+            elements.scheduleEndDate.value = '';
+            elements.scheduleIsAllDay.checked = true;
+            elements.scheduleTimeGroup.style.display = 'none';
+            elements.scheduleStartTime.value = '';
+            elements.scheduleCategory.value = '회의';
+            elements.scheduleLocation.value = '';
+            elements.scheduleDescription.value = '';
+
+            elements.scheduleColorInputs.forEach((radio, idx) => {
+                radio.checked = (idx === 0);
+            });
+
+            elements.btnDeleteSchedule.style.display = 'none';
+        }
+        elements.scheduleModalBackdrop.classList.add('show');
+    }
+
+    function closeScheduleModal() {
+        elements.scheduleModalBackdrop.classList.remove('show');
+    }
+
+    async function handleSaveSchedule(e) {
+        e.preventDefault();
+        const id = elements.scheduleId.value;
+        const title = elements.scheduleTitle.value.trim();
+        const startDate = elements.scheduleStartDate.value;
+        if (!title || !startDate) {
+            showToast('일정 제목과 시작 날짜를 입력해주세요.', 'error');
+            return;
+        }
+
+        let selectedColor = '#6366f1';
+        elements.scheduleColorInputs.forEach(radio => {
+            if (radio.checked) selectedColor = radio.value;
+        });
+
+        const isAllDay = elements.scheduleIsAllDay.checked;
+        const payload = {
+            title: title,
+            start_date: startDate,
+            end_date: elements.scheduleEndDate.value || null,
+            start_time: isAllDay ? null : (elements.scheduleStartTime.value || null),
+            is_all_day: isAllDay,
+            category: elements.scheduleCategory.value,
+            color: selectedColor,
+            location: elements.scheduleLocation.value.trim(),
+            description: elements.scheduleDescription.value.trim()
+        };
+
+        const isEdit = Boolean(id);
+        const url = isEdit ? `/api/schedules/${id}` : '/api/schedules';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        try {
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(isEdit ? '일정이 수정되었습니다.' : '새 일정이 등록되었습니다!', 'success');
+                closeScheduleModal();
+                await fetchSchedules();
+            } else {
+                showToast(data.message || '일정 저장에 실패했습니다.', 'error');
+            }
+        } catch (err) {
+            console.error('Schedule save error:', err);
+            showToast('일정 저장 중 오류가 발생했습니다.', 'error');
+        }
+    }
+
+    async function handleDeleteSchedule() {
+        const id = elements.scheduleId.value;
+        const title = elements.scheduleTitle.value.trim();
+        if (!id) return;
+
+        if (!confirm(`"${title}" 일정을 삭제하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/schedules/${id}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast('일정이 삭제되었습니다.', 'info');
+                closeScheduleModal();
+                await fetchSchedules();
+            } else {
+                showToast(data.message || '일정 삭제 실패', 'error');
+            }
+        } catch (err) {
+            console.error('Schedule delete error:', err);
+            showToast('일정 삭제 중 오류가 발생했습니다.', 'error');
         }
     }
 
@@ -590,6 +871,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 low: '낮음'
             }[todo.priority] || '보통';
 
+            // Assignee Badge
+            let assigneeBadgeHtml = '';
+            if (todo.assignee && todo.assignee.trim()) {
+                assigneeBadgeHtml = `
+                    <span class="badge badge-assignee" title="담당자: ${escapeHtml(todo.assignee)}">
+                        <i class="fa-solid fa-user-check"></i> ${escapeHtml(todo.assignee)}
+                    </span>
+                `;
+            }
+
             // Due Date Badge Logic
             let dueBadgeHtml = '';
             if (todo.due_date) {
@@ -634,6 +925,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span class="badge badge-category">
                                 <i class="fa-solid fa-tag"></i> ${escapeHtml(todo.category)}
                             </span>
+                            ${assigneeBadgeHtml}
                             <span class="badge badge-priority-${todo.priority}">
                                 <i class="fa-solid fa-flag"></i> ${priorityLabel}
                             </span>

@@ -1,11 +1,10 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
+  "functions": {
+    "api/index.py": {
+      "includeFiles": "todo_app/**",
+      "excludeFiles": "{강의자료/**,실습/**,최종프로젝트/**,*.ipynb,*.bat,*.txt,*.html}"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/static/(.*)",
@@ -13,7 +12,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "api/index.py"
+      "dest": "/api/index.py"
     }
   ]
 }

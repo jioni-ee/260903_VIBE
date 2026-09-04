@@ -140,6 +140,97 @@ class TodoAppTestCase(unittest.TestCase):
         toggle_res = self.client.patch(f'/api/todos/{todo_id}/toggle')
         self.assertEqual(toggle_res.status_code, 404)
 
+    def test_create_todo_with_assignee(self):
+        """담당자(assignee) 포함 할 일 생성 및 수정 검증"""
+        payload = {
+            'title': '담당자 테스트 작업',
+            'category': '개발',
+            'priority': 'high',
+            'assignee': '김엔지니어'
+        }
+        res = self.client.post('/api/todos',
+                               data=json.dumps(payload),
+                               content_type='application/json')
+        self.assertEqual(res.status_code, 201)
+        data = json.loads(res.data)
+        self.assertEqual(data['todo']['assignee'], '김엔지니어')
+
+        todo_id = data['todo']['id']
+        # 수정 시 담당자 변경 확인
+        update_payload = {
+            'title': '담당자 테스트 작업 (수정)',
+            'category': '업무',
+            'assignee': '이매니저'
+        }
+        put_res = self.client.put(f'/api/todos/{todo_id}',
+                                  data=json.dumps(update_payload),
+                                  content_type='application/json')
+        self.assertEqual(put_res.status_code, 200)
+        put_data = json.loads(put_res.data)
+        self.assertEqual(put_data['todo']['assignee'], '이매니저')
+
+    def test_schedule_crud(self):
+        """달력 일정(Schedule) 생성, 조회, 수정, 삭제 CRUD 검증"""
+        # 1. 일정 생성
+        payload = {
+            'title': '2026 Q3 프로젝트 킥오프',
+            'start_date': '2026-09-10',
+            'end_date': '2026-09-10',
+            'is_all_day': False,
+            'start_time': '14:00',
+            'category': '회의',
+            'color': '#6366f1',
+            'location': '대회의실 A',
+            'description': '전체 팀원 참석 필수'
+        }
+        create_res = self.client.post('/api/schedules',
+                                      data=json.dumps(payload),
+                                      content_type='application/json')
+        self.assertEqual(create_res.status_code, 201)
+        create_data = json.loads(create_res.data)
+        self.assertTrue(create_data['success'])
+        schedule_id = create_data['schedule']['id']
+        self.assertEqual(create_data['schedule']['title'], '2026 Q3 프로젝트 킥오프')
+        self.assertEqual(create_data['schedule']['start_time'], '14:00')
+
+        # 2. 일정 목록 조회
+        get_res = self.client.get('/api/schedules')
+        self.assertEqual(get_res.status_code, 200)
+        get_data = json.loads(get_res.data)
+        self.assertTrue(get_data['success'])
+        self.assertTrue(any(s['id'] == schedule_id for s in get_data['schedules']))
+
+        # 3. 일정 수정
+        update_payload = {
+            'title': '2026 Q3 프로젝트 킥오프 (온라인 진행)',
+            'start_date': '2026-09-11',
+            'is_all_day': True,
+            'start_time': None,
+            'category': '행사',
+            'color': '#10b981',
+            'location': '온라인 Zoom',
+            'description': '링크 추후 공지'
+        }
+        put_res = self.client.put(f'/api/schedules/{schedule_id}',
+                                  data=json.dumps(update_payload),
+                                  content_type='application/json')
+        self.assertEqual(put_res.status_code, 200)
+        put_data = json.loads(put_res.data)
+        self.assertEqual(put_data['schedule']['title'], '2026 Q3 프로젝트 킥오프 (온라인 진행)')
+        self.assertEqual(put_data['schedule']['start_date'], '2026-09-11')
+        self.assertEqual(put_data['schedule']['is_all_day'], 1)
+
+        # 4. 일정 삭제
+        del_res = self.client.delete(f'/api/schedules/{schedule_id}')
+        self.assertEqual(del_res.status_code, 200)
+        del_data = json.loads(del_res.data)
+        self.assertTrue(del_data['success'])
+
+        # 삭제 후 재조회 시 목록에 없음 확인
+        get_after = self.client.get('/api/schedules')
+        get_after_data = json.loads(get_after.data)
+        self.assertFalse(any(s['id'] == schedule_id for s in get_after_data['schedules']))
+
 
 if __name__ == '__main__':
     unittest.main()

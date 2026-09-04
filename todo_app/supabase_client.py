@@ -41,6 +41,10 @@ def is_supabase_enabled() -> bool:
     return bool(url and key)
 
 
+# ==============================================================================
+# Todos CRUD (with Assignee support)
+# ==============================================================================
+
 def get_todos(filter_status='all', category='', priority='', search='', sort_by='created_desc'):
     """Supabase에서 할 일 목록 조회"""
     sb = get_supabase()
@@ -58,10 +62,8 @@ def get_todos(filter_status='all', category='', priority='', search='', sort_by=
         query = query.eq('priority', priority)
 
     if search:
-        # Supabase ilike or or-filter
-        query = query.or_(f'title.ilike.%{search}%,description.ilike.%{search}%')
+        query = query.or_(f'title.ilike.%{search}%,description.ilike.%{search}%,assignee.ilike.%{search}%')
 
-    # 정렬
     if sort_by == 'created_asc':
         query = query.order('id', desc=False)
     elif sort_by == 'due_date':
@@ -72,7 +74,6 @@ def get_todos(filter_status='all', category='', priority='', search='', sort_by=
     res = query.execute()
     todos = res.data or []
 
-    # 우선순위 정렬이 필요한 경우 파이썬 레벨 정렬 지원
     if sort_by == 'priority':
         priority_map = {'high': 1, 'medium': 2, 'low': 3}
         todos.sort(key=lambda x: priority_map.get(x.get('priority', 'medium'), 4))
@@ -80,43 +81,69 @@ def get_todos(filter_status='all', category='', priority='', search='', sort_by=
     return todos
 
 
-def create_todo(title, description='', category='일반', priority='medium', due_date=None):
+def create_todo(title, description='', category='일반', priority='medium', due_date=None, assignee=''):
     """Supabase에 새 할 일 생성"""
     sb = get_supabase()
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    assignee_val = assignee.strip() if (category in ['업무', '개발'] and assignee) else ''
     payload = {
         'title': title,
         'description': description or '',
         'category': category or '일반',
         'priority': priority or 'medium',
         'due_date': due_date if due_date else None,
+        'assignee': assignee_val,
         'completed': 0,
         'created_at': now_str,
         'updated_at': now_str
     }
-    res = sb.table('todos').insert(payload).execute()
-    if res.data and len(res.data) > 0:
-        return res.data[0]
-    return payload
+    try:
+        res = sb.table('todos').insert(payload).execute()
+        if res.data and len(res.data) > 0:
+            return res.data[0]
+        return payload
+    except Exception as e:
+        if 'assignee' in payload and ('PGRST204' in str(e) or 'assignee' in str(e)):
+            del payload['assignee']
+            res = sb.table('todos').insert(payload).execute()
+            if res.data and len(res.data) > 0:
+                ret = res.data[0]
+                ret['assignee'] = assignee_val
+                return ret
+            return payload
+        raise
 
 
-def update_todo(todo_id, title, description='', category='일반', priority='medium', due_date=None, completed=0):
+def update_todo(todo_id, title, description='', category='일반', priority='medium', due_date=None, completed=0, assignee=''):
     """Supabase 할 일 수정"""
     sb = get_supabase()
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    assignee_val = assignee.strip() if (category in ['업무', '개발'] and assignee) else ''
     payload = {
         'title': title,
         'description': description or '',
         'category': category or '일반',
         'priority': priority or 'medium',
         'due_date': due_date if due_date else None,
+        'assignee': assignee_val,
         'completed': 1 if completed else 0,
         'updated_at': now_str
     }
-    res = sb.table('todos').update(payload).eq('id', todo_id).execute()
-    if res.data and len(res.data) > 0:
-        return res.data[0]
-    return None
+    try:
+        res = sb.table('todos').update(payload).eq('id', todo_id).execute()
+        if res.data and len(res.data) > 0:
+            return res.data[0]
+        return None
+    except Exception as e:
+        if 'assignee' in payload and ('PGRST204' in str(e) or 'assignee' in str(e)):
+            del payload['assignee']
+            res = sb.table('todos').update(payload).eq('id', todo_id).execute()
+            if res.data and len(res.data) > 0:
+                ret = res.data[0]
+                ret['assignee'] = assignee_val
+                return ret
+            return None
+        raise
 
 
 def toggle_todo(todo_id):
@@ -180,3 +207,75 @@ def get_stats():
         'priority_counts': priority_counts,
         'categories': categories
     }
+
+
+# ==============================================================================
+# Schedules CRUD (Calendar Dedicated Events)
+# ==============================================================================
+
+def get_schedules(month_prefix=None, start_date=None, end_date=None):
+    """일정 목록 조회"""
+    sb = get_supabase()
+    query = sb.table('schedules').select('*')
+
+    if month_prefix:
+        # e.g., '2026-09'
+        query = query.or_(f'start_date.like.{month_prefix}%,end_date.like.{month_prefix}%')
+    elif start_date and end_date:
+        query = query.gte('start_date', start_date).lte('start_date', end_date)
+
+    query = query.order('start_date', desc=False).order('start_time', desc=False)
+    res = query.execute()
+    return res.data or []
+
+
+def create_schedule(title, start_date, end_date=None, start_time='', is_all_day=1, location='', color='#6366f1', category='회의', description=''):
+    """새 일정 생성"""
+    sb = get_supabase()
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    payload = {
+        'title': title.strip(),
+        'description': description.strip() if description else '',
+        'start_date': start_date.strip(),
+        'end_date': end_date.strip() if end_date else start_date.strip(),
+        'start_time': start_time.strip() if start_time else '',
+        'is_all_day': 1 if is_all_day else 0,
+        'location': location.strip() if location else '',
+        'color': color.strip() if color else '#6366f1',
+        'category': category.strip() if category else '회의',
+        'created_at': now_str,
+        'updated_at': now_str
+    }
+    res = sb.table('schedules').insert(payload).execute()
+    if res.data and len(res.data) > 0:
+        return res.data[0]
+    return payload
+
+
+def update_schedule(schedule_id, title, start_date, end_date=None, start_time='', is_all_day=1, location='', color='#6366f1', category='회의', description=''):
+    """일정 수정"""
+    sb = get_supabase()
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    payload = {
+        'title': title.strip(),
+        'description': description.strip() if description else '',
+        'start_date': start_date.strip(),
+        'end_date': end_date.strip() if end_date else start_date.strip(),
+        'start_time': start_time.strip() if start_time else '',
+        'is_all_day': 1 if is_all_day else 0,
+        'location': location.strip() if location else '',
+        'color': color.strip() if color else '#6366f1',
+        'category': category.strip() if category else '회의',
+        'updated_at': now_str
+    }
+    res = sb.table('schedules').update(payload).eq('id', schedule_id).execute()
+    if res.data and len(res.data) > 0:
+        return res.data[0]
+    return None
+
+
+def delete_schedule(schedule_id):
+    """일정 삭제"""
+    sb = get_supabase()
+    res = sb.table('schedules').delete().eq('id', schedule_id).execute()
+    return bool(res.data and len(res.data) > 0)
