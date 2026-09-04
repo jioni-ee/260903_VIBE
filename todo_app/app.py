@@ -3,6 +3,31 @@ import sqlite3
 from datetime import datetime, date
 from flask import Flask, render_template, request, jsonify, g
 
+# Supabase 클라이언트 임포트 (존재할 경우)
+try:
+    from supabase_client import (
+        is_supabase_enabled,
+        get_todos as sb_get_todos,
+        create_todo as sb_create_todo,
+        update_todo as sb_update_todo,
+        toggle_todo as sb_toggle_todo,
+        delete_todo as sb_delete_todo,
+        get_stats as sb_get_stats
+    )
+except ImportError:
+    try:
+        from todo_app.supabase_client import (
+            is_supabase_enabled,
+            get_todos as sb_get_todos,
+            create_todo as sb_create_todo,
+            update_todo as sb_update_todo,
+            toggle_todo as sb_toggle_todo,
+            delete_todo as sb_delete_todo,
+            get_stats as sb_get_stats
+        )
+    except ImportError:
+        def is_supabase_enabled(): return False
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(
     __name__,
@@ -21,9 +46,9 @@ _db_initialized = False
 
 @app.before_request
 def ensure_db_initialized():
-    """서버리스 환경 콜드 스타트 시 DB 자동 초기화 보장"""
+    """서버리스 환경 콜드 스타트 시 DB 자동 초기화 보장 (SQLite 모드일 때만)"""
     global _db_initialized
-    if not _db_initialized:
+    if not is_supabase_enabled() and not _db_initialized:
         init_db()
         _db_initialized = True
 
@@ -46,7 +71,7 @@ def close_connection(exception):
 
 
 def init_db():
-    """테이블 초기화 및 기본 샘플 데이터 시딩"""
+    """SQLite 테이블 초기화 및 기본 샘플 데이터 시딩"""
     with app.app_context():
         db = get_db()
         cursor = db.cursor()
@@ -65,7 +90,6 @@ def init_db():
         ''')
         db.commit()
 
-        # 샘플 데이터가 없으면 시딩
         cursor.execute('SELECT COUNT(*) as cnt FROM todos')
         if cursor.fetchone()['cnt'] == 0:
             today_str = date.today().strftime('%Y-%m-%d')
@@ -98,6 +122,16 @@ def get_todos():
     search = request.args.get('search', '').strip()
     sort_by = request.args.get('sort', 'created_desc')  # created_desc, created_asc, due_date, priority
 
+    # 1. Supabase 연동 모드
+    if is_supabase_enabled():
+        try:
+            todos = sb_get_todos(filter_status, category, priority, search, sort_by)
+            return jsonify({'success': True, 'todos': todos, 'count': len(todos), 'source': 'supabase'})
+        except Exception as e:
+            app.logger.error(f'Supabase error: {e}')
+            # 오류 발생 시 SQLite로 fallback
+
+    # 2. 로컬 SQLite 모드
     query = 'SELECT * FROM todos WHERE 1=1'
     params = []
 
@@ -119,7 +153,6 @@ def get_todos():
         params.append(f'%{search}%')
         params.append(f'%{search}%')
 
-    # 정렬 규칙
     if sort_by == 'created_asc':
         query += ' ORDER BY id ASC'
     elif sort_by == 'due_date':
@@ -134,7 +167,7 @@ def get_todos():
                     ELSE 4 
                 END ASC, id DESC
         """
-    else:  # default: created_desc
+    else:
         query += ' ORDER BY id DESC'
 
     db = get_db()
@@ -142,7 +175,7 @@ def get_todos():
     cursor.execute(query, params)
     todos = [dict(row) for row in cursor.fetchall()]
 
-    return jsonify({'success': True, 'todos': todos, 'count': len(todos)})
+    return jsonify({'success': True, 'todos': todos, 'count': len(todos), 'source': 'sqlite'})
 
 
 @app.route('/api/todos', methods=['POST'])
@@ -163,8 +196,16 @@ def create_todo():
     if due_date:
         due_date = due_date.strip()
 
-    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # 1. Supabase 연동 모드
+    if is_supabase_enabled():
+        try:
+            new_todo = sb_create_todo(title, description, category, priority, due_date)
+            return jsonify({'success': True, 'todo': new_todo, 'message': '할 일이 성공적으로 추가되었습니다.', 'source': 'supabase'}), 201
+        except Exception as e:
+            app.logger.error(f'Supabase create error: {e}')
 
+    # 2. SQLite 모드
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     db = get_db()
     cursor = db.cursor()
     cursor.execute('''
@@ -177,7 +218,7 @@ def create_todo():
     cursor.execute('SELECT * FROM todos WHERE id = ?', (todo_id,))
     new_todo = dict(cursor.fetchone())
 
-    return jsonify({'success': True, 'todo': new_todo, 'message': '할 일이 성공적으로 추가되었습니다.'}), 201
+    return jsonify({'success': True, 'todo': new_todo, 'message': '할 일이 성공적으로 추가되었습니다.', 'source': 'sqlite'}), 201
 
 
 @app.route('/api/todos/<int:todo_id>', methods=['PUT'])
@@ -199,8 +240,19 @@ def update_todo(todo_id):
         due_date = due_date.strip()
 
     completed = 1 if data.get('completed') else 0
-    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+    # 1. Supabase 모드
+    if is_supabase_enabled():
+        try:
+            updated_todo = sb_update_todo(todo_id, title, description, category, priority, due_date, completed)
+            if not updated_todo:
+                return jsonify({'success': False, 'message': '해당 할 일을 찾을 수 없습니다.'}), 404
+            return jsonify({'success': True, 'todo': updated_todo, 'message': '할 일이 수정되었습니다.', 'source': 'supabase'})
+        except Exception as e:
+            app.logger.error(f'Supabase update error: {e}')
+
+    # 2. SQLite 모드
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     db = get_db()
     cursor = db.cursor()
     cursor.execute('''
@@ -216,12 +268,23 @@ def update_todo(todo_id):
     cursor.execute('SELECT * FROM todos WHERE id = ?', (todo_id,))
     updated_todo = dict(cursor.fetchone())
 
-    return jsonify({'success': True, 'todo': updated_todo, 'message': '할 일이 수정되었습니다.'})
+    return jsonify({'success': True, 'todo': updated_todo, 'message': '할 일이 수정되었습니다.', 'source': 'sqlite'})
 
 
 @app.route('/api/todos/<int:todo_id>/toggle', methods=['PATCH'])
 def toggle_todo(todo_id):
     """할 일 완료/미완료 토글"""
+    # 1. Supabase 모드
+    if is_supabase_enabled():
+        try:
+            todo = sb_toggle_todo(todo_id)
+            if not todo:
+                return jsonify({'success': False, 'message': '해당 할 일을 찾을 수 없습니다.'}), 404
+            return jsonify({'success': True, 'todo': todo, 'completed': bool(todo.get('completed')), 'source': 'supabase'})
+        except Exception as e:
+            app.logger.error(f'Supabase toggle error: {e}')
+
+    # 2. SQLite 모드
     db = get_db()
     cursor = db.cursor()
     cursor.execute('SELECT completed FROM todos WHERE id = ?', (todo_id,))
@@ -243,12 +306,23 @@ def toggle_todo(todo_id):
     cursor.execute('SELECT * FROM todos WHERE id = ?', (todo_id,))
     todo = dict(cursor.fetchone())
 
-    return jsonify({'success': True, 'todo': todo, 'completed': bool(new_status)})
+    return jsonify({'success': True, 'todo': todo, 'completed': bool(new_status), 'source': 'sqlite'})
 
 
 @app.route('/api/todos/<int:todo_id>', methods=['DELETE'])
 def delete_todo(todo_id):
     """할 일 삭제"""
+    # 1. Supabase 모드
+    if is_supabase_enabled():
+        try:
+            success = sb_delete_todo(todo_id)
+            if not success:
+                return jsonify({'success': False, 'message': '해당 할 일을 찾을 수 없습니다.'}), 404
+            return jsonify({'success': True, 'message': '할 일이 삭제되었습니다.', 'source': 'supabase'})
+        except Exception as e:
+            app.logger.error(f'Supabase delete error: {e}')
+
+    # 2. SQLite 모드
     db = get_db()
     cursor = db.cursor()
     cursor.execute('DELETE FROM todos WHERE id = ?', (todo_id,))
@@ -257,12 +331,21 @@ def delete_todo(todo_id):
     if cursor.rowcount == 0:
         return jsonify({'success': False, 'message': '해당 할 일을 찾을 수 없습니다.'}), 404
 
-    return jsonify({'success': True, 'message': '할 일이 삭제되었습니다.'})
+    return jsonify({'success': True, 'message': '할 일이 삭제되었습니다.', 'source': 'sqlite'})
 
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
     """통계 요약 데이터 반환"""
+    # 1. Supabase 모드
+    if is_supabase_enabled():
+        try:
+            stats = sb_get_stats()
+            return jsonify({'success': True, 'stats': stats, 'source': 'supabase'})
+        except Exception as e:
+            app.logger.error(f'Supabase stats error: {e}')
+
+    # 2. SQLite 모드
     db = get_db()
     cursor = db.cursor()
 
@@ -298,7 +381,8 @@ def get_stats():
             'overdue': overdue,
             'priority_counts': priority_counts,
             'categories': categories
-        }
+        },
+        'source': 'sqlite'
     })
 
 
