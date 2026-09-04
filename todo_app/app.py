@@ -3,8 +3,29 @@ import sqlite3
 from datetime import datetime, date
 from flask import Flask, render_template, request, jsonify, g
 
-app = Flask(__name__)
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'todo.db')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, 'templates'),
+    static_folder=os.path.join(BASE_DIR, 'static')
+)
+
+# Vercel 환경(/tmp) 및 로컬 환경 DB 경로 분기
+if os.environ.get('VERCEL'):
+    DB_PATH = '/tmp/todo.db'
+else:
+    DB_PATH = os.path.join(BASE_DIR, 'todo.db')
+
+_db_initialized = False
+
+
+@app.before_request
+def ensure_db_initialized():
+    """서버리스 환경 콜드 스타트 시 DB 자동 초기화 보장"""
+    global _db_initialized
+    if not _db_initialized:
+        init_db()
+        _db_initialized = True
 
 
 def get_db():
