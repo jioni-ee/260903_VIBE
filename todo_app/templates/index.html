@@ -62,14 +62,17 @@
                 </div>
 
                 <div class="calendar-actions">
-                    <button type="button" class="btn-cal-nav" id="calPrevMonthBtn" title="이전 달">
-                        <i class="fa-solid fa-chevron-left"></i>
-                    </button>
-                    <button type="button" class="btn-cal-today" id="calTodayBtn">오늘</button>
-                    <button type="button" class="btn-cal-nav" id="calNextMonthBtn" title="다음 달">
-                        <i class="fa-solid fa-chevron-right"></i>
-                    </button>
-                    <button type="button" class="btn-cal-toggle" id="calToggleCollapseBtn" title="달력 접기/펼치기">
+                    <div class="calendar-nav-group" id="calendarNavGroup">
+                        <button type="button" class="btn-cal-nav" id="calPrevMonthBtn" title="이전 달">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <button type="button" class="btn-cal-today" id="calTodayBtn">오늘</button>
+                        <button type="button" class="btn-cal-nav" id="calNextMonthBtn" title="다음 달">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <button type="button" class="btn-cal-toggle-pill" id="calToggleCollapseBtn" title="달력 접기/펼치기">
+                        <span id="calToggleText">달력 접기</span>
                         <i class="fa-solid fa-chevron-up" id="calToggleIcon"></i>
                     </button>
                 </div>

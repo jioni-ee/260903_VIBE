@@ -31,11 +31,14 @@ document.addEventListener('DOMContentLoaded', () => {
         countCompleted: document.getElementById('countCompleted'),
 
         // Calendar Elements
+        calendarSection: document.getElementById('calendarSection'),
+        calendarTitleGroup: document.querySelector('.calendar-title-group'),
         calendarMonthTitle: document.getElementById('calendarMonthTitle'),
         calPrevMonthBtn: document.getElementById('calPrevMonthBtn'),
         calNextMonthBtn: document.getElementById('calNextMonthBtn'),
         calTodayBtn: document.getElementById('calTodayBtn'),
         calToggleCollapseBtn: document.getElementById('calToggleCollapseBtn'),
+        calToggleText: document.getElementById('calToggleText'),
         calToggleIcon: document.getElementById('calToggleIcon'),
         calendarBody: document.getElementById('calendarBody'),
         calendarDaysGrid: document.getElementById('calendarDaysGrid'),
@@ -158,11 +161,42 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCalendar();
         });
 
-        elements.calToggleCollapseBtn.addEventListener('click', () => {
-            state.calendarCollapsed = !state.calendarCollapsed;
+        // 캘린더 접기/펼치기 토글 함수
+        function toggleCalendarCollapse(force) {
+            if (typeof force === 'boolean') {
+                state.calendarCollapsed = force;
+            } else {
+                state.calendarCollapsed = !state.calendarCollapsed;
+            }
             elements.calendarBody.classList.toggle('collapsed', state.calendarCollapsed);
-            elements.calToggleIcon.className = state.calendarCollapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+            if (elements.calendarSection) {
+                elements.calendarSection.classList.toggle('is-collapsed', state.calendarCollapsed);
+            }
+            if (elements.calToggleText) {
+                elements.calToggleText.textContent = state.calendarCollapsed ? '달력 펼치기' : '달력 접기';
+            }
+            if (elements.calToggleIcon) {
+                elements.calToggleIcon.className = state.calendarCollapsed ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-up';
+            }
+            localStorage.setItem('taskflow_cal_collapsed', state.calendarCollapsed ? 'true' : 'false');
+        }
+
+        elements.calToggleCollapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleCalendarCollapse();
         });
+
+        if (elements.calendarTitleGroup) {
+            elements.calendarTitleGroup.addEventListener('click', () => {
+                toggleCalendarCollapse();
+            });
+        }
+
+        // 저장된 캘린더 상태 복원
+        const savedCollapsed = localStorage.getItem('taskflow_cal_collapsed');
+        if (savedCollapsed === 'true') {
+            toggleCalendarCollapse(true);
+        }
 
         elements.btnClearDateFilter.addEventListener('click', () => {
             clearDateFilter();
