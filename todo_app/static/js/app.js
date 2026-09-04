@@ -101,6 +101,14 @@ document.addEventListener('DOMContentLoaded', () => {
         btnCancelSchedule: document.getElementById('btnCancelSchedule'),
         btnDeleteSchedule: document.getElementById('btnDeleteSchedule'),
 
+        // Day Details Popover Elements
+        calDayPopover: document.getElementById('calDayPopover'),
+        popoverDateTitle: document.getElementById('popoverDateTitle'),
+        popoverTotalBadge: document.getElementById('popoverTotalBadge'),
+        btnClosePopover: document.getElementById('btnClosePopover'),
+        popoverBody: document.getElementById('popoverBody'),
+        btnPopoverAddSchedule: document.getElementById('btnPopoverAddSchedule'),
+
         // Toast
         toastContainer: document.getElementById('toastContainer')
     };
@@ -124,13 +132,29 @@ document.addEventListener('DOMContentLoaded', () => {
         // Form Submit (Add Todo)
         elements.addTodoForm.addEventListener('submit', handleAddTodo);
 
-        // Status Tabs Filter
+        // Status Tabs Filter & Double-click Today Toggle
         elements.tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 elements.tabButtons.forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
                 state.filter = button.dataset.filter;
                 fetchTodos();
+            });
+
+            button.addEventListener('dblclick', (e) => {
+                e.preventDefault();
+                const todayStr = getTodayString();
+                if (state.selectedDate === todayStr) {
+                    clearDateFilter();
+                    showToast('오늘 날짜 필터가 해제되었습니다.', 'info');
+                } else {
+                    state.selectedDate = todayStr;
+                    elements.filterDateDisplay.textContent = todayStr;
+                    elements.calendarFilterIndicator.style.display = 'flex';
+                    renderCalendar();
+                    renderFilteredTodoList();
+                    showToast(`오늘(${todayStr}) 마감 작업 필터링 적용`, 'info');
+                }
             });
         });
 
@@ -272,9 +296,32 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Global Keydown (Escape closes open modal)
+        // Popover Events
+        if (elements.btnClosePopover) {
+            elements.btnClosePopover.addEventListener('click', hideDayPopover);
+        }
+        if (elements.calDayPopover) {
+            elements.calDayPopover.addEventListener('mouseenter', () => {
+                clearTimeout(popoverHideTimer);
+            });
+            elements.calDayPopover.addEventListener('mouseleave', () => {
+                popoverHideTimer = setTimeout(() => hideDayPopover(), 220);
+            });
+        }
+        document.addEventListener('click', (e) => {
+            if (elements.calDayPopover && elements.calDayPopover.style.display !== 'none') {
+                if (!elements.calDayPopover.contains(e.target) && !e.target.closest('.cal-day-cell')) {
+                    hideDayPopover();
+                }
+            }
+        });
+
+        // Global Keydown (Escape closes open modal or popover)
         window.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                if (elements.calDayPopover && elements.calDayPopover.style.display !== 'none') {
+                    hideDayPopover();
+                }
                 if (elements.editModalBackdrop && elements.editModalBackdrop.classList.contains('show')) {
                     closeModal();
                 }
@@ -441,11 +488,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
         elements.calendarDaysGrid.innerHTML = daysHtml;
 
-        // 셀 클릭 이벤트 바인딩
+        // 셀 마우스 호버, 클릭, 더블클릭 이벤트 바인딩
         elements.calendarDaysGrid.querySelectorAll('.cal-day-cell').forEach(cell => {
-            cell.addEventListener('click', () => {
-                const dateStr = cell.dataset.date;
+            const dateStr = cell.dataset.date;
+
+            // 1. 마우스 호버 시 상세 팝오버 오버레이 노출
+            cell.addEventListener('mouseenter', () => {
+                clearTimeout(popoverHideTimer);
+                popoverShowTimer = setTimeout(() => {
+                    showDayPopover(cell, dateStr);
+                }, 180);
+            });
+
+            cell.addEventListener('mouseleave', () => {
+                clearTimeout(popoverShowTimer);
+                popoverHideTimer = setTimeout(() => {
+                    hideDayPopover();
+                }, 220);
+            });
+
+            // 2. 셀 클릭 시 날짜 필터링 및 팝오버 토글
+            cell.addEventListener('click', (e) => {
+                if (e.target.closest('.cal-schedule-chip')) return;
+
                 handleDateCellClick(dateStr);
+
+                if (elements.calDayPopover && elements.calDayPopover.style.display !== 'none' && currentPopoverDate === dateStr) {
+                    hideDayPopover();
+                } else {
+                    showDayPopover(cell, dateStr);
+                }
+            });
+
+            // 3. 셀 더블클릭 시 일정 추가 모달 오픈
+            cell.addEventListener('dblclick', (e) => {
+                if (e.target.closest('.cal-schedule-chip')) return;
+                hideDayPopover();
+                openScheduleModal(null, dateStr);
             });
         });
 
@@ -453,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.calendarDaysGrid.querySelectorAll('.cal-schedule-chip').forEach(chip => {
             chip.addEventListener('click', (e) => {
                 e.stopPropagation();
+                hideDayPopover();
                 const schedId = chip.dataset.scheduleId;
                 const schedule = state.schedules.find(s => s.id == schedId);
                 if (schedule) {
@@ -556,6 +636,174 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         renderTodoList(displayList);
+    }
+
+    // =========================================================================
+    // Day Details Popover (Full Items Overlay)
+    // =========================================================================
+    let popoverShowTimer = null;
+    let popoverHideTimer = null;
+    let currentPopoverDate = null;
+
+    function showDayPopover(cell, dateStr) {
+        if (!elements.calDayPopover) return;
+        currentPopoverDate = dateStr;
+
+        // 1. 해당 날짜에 해당하는 일정(Schedule) 수집
+        const schedules = [];
+        state.schedules.forEach(sc => {
+            if (sc.start_date) {
+                const start = sc.start_date;
+                const end = sc.end_date || sc.start_date;
+                if (dateStr >= start && dateStr <= end) {
+                    schedules.push(sc);
+                }
+            }
+        });
+
+        // 2. 해당 날짜 마감인 할 일(Todo) 수집
+        const todos = state.allTodos.filter(t => t.due_date === dateStr);
+        const totalCount = schedules.length + todos.length;
+
+        // 날짜 포맷 (예: 2026년 9월 4일 (금))
+        const d = new Date(dateStr + 'T00:00:00');
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        const dateFormatted = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${dayNames[d.getDay()]})`;
+
+        elements.popoverDateTitle.textContent = dateFormatted;
+        elements.popoverTotalBadge.textContent = `${totalCount}건`;
+
+        let bodyHtml = '';
+
+        if (totalCount === 0) {
+            bodyHtml = `
+                <div class="popover-empty-notice">
+                    <i class="fa-regular fa-calendar-plus" style="font-size: 1.6rem; opacity: 0.4; margin-bottom: 0.4rem; display: block;"></i>
+                    등록된 일정이나 할 일이 없습니다.
+                </div>
+            `;
+        } else {
+            // 1. 일정 섹션
+            if (schedules.length > 0) {
+                bodyHtml += `
+                    <div class="popover-section">
+                        <div class="popover-section-title">
+                            <i class="fa-solid fa-calendar-days" style="color: #8b5cf6;"></i> 일정 (${schedules.length})
+                        </div>
+                        <div class="popover-list">
+                `;
+                schedules.forEach(sc => {
+                    const color = sc.color || '#6366f1';
+                    const time = (!sc.is_all_day && sc.start_time) ? sc.start_time : '종일';
+                    const loc = sc.location ? ` · ${escapeHtml(sc.location)}` : '';
+                    bodyHtml += `
+                        <div class="popover-item popover-item-schedule" data-schedule-id="${sc.id}" title="클릭하여 일정 수정">
+                            <div class="popover-item-left">
+                                <span class="popover-item-color-bar" style="background: ${color};"></span>
+                                <span class="popover-item-title">${escapeHtml(sc.title)}</span>
+                            </div>
+                            <div class="popover-item-meta">
+                                <span>${time}${loc}</span>
+                                <i class="fa-solid fa-angle-right" style="font-size: 0.7rem; opacity: 0.5;"></i>
+                            </div>
+                        </div>
+                    `;
+                });
+                bodyHtml += `</div></div>`;
+            }
+
+            // 2. 할 일 섹션
+            if (todos.length > 0) {
+                bodyHtml += `
+                    <div class="popover-section">
+                        <div class="popover-section-title">
+                            <i class="fa-solid fa-list-check" style="color: #06b6d4;"></i> 마감 할 일 (${todos.length})
+                        </div>
+                        <div class="popover-list">
+                `;
+                todos.forEach(t => {
+                    const isCompleted = t.completed === 1;
+                    const priorityColor = {
+                        high: '#ef4444',
+                        medium: '#f59e0b',
+                        low: '#10b981'
+                    }[t.priority] || '#94a3b8';
+                    const assigneeText = t.assignee ? ` [${escapeHtml(t.assignee)}]` : '';
+
+                    bodyHtml += `
+                        <div class="popover-item popover-item-todo ${isCompleted ? 'is-completed' : ''}" data-todo-id="${t.id}" title="클릭하여 할 일 수정">
+                            <div class="popover-item-left">
+                                <span class="popover-item-color-bar" style="background: ${priorityColor};"></span>
+                                <span class="popover-item-title">${escapeHtml(t.title)}</span>
+                            </div>
+                            <div class="popover-item-meta">
+                                <span style="font-size: 0.68rem; opacity: 0.85;">${escapeHtml(t.category)}${assigneeText}</span>
+                                <i class="${isCompleted ? 'fa-solid fa-circle-check' : 'fa-regular fa-circle'}" style="color: ${isCompleted ? 'var(--status-success)' : 'var(--text-muted)'};"></i>
+                            </div>
+                        </div>
+                    `;
+                });
+                bodyHtml += `</div></div>`;
+            }
+        }
+
+        elements.popoverBody.innerHTML = bodyHtml;
+
+        // 하단 일정 추가 버튼 연동
+        elements.btnPopoverAddSchedule.onclick = () => {
+            hideDayPopover();
+            openScheduleModal(null, dateStr);
+        };
+
+        // 팝오버 내부 아이템 클릭 이벤트
+        elements.popoverBody.querySelectorAll('.popover-item-schedule').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = item.dataset.scheduleId;
+                const sc = state.schedules.find(s => s.id == id);
+                if (sc) {
+                    hideDayPopover();
+                    openScheduleModal(sc);
+                }
+            });
+        });
+
+        elements.popoverBody.querySelectorAll('.popover-item-todo').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const id = item.dataset.todoId;
+                const todo = state.allTodos.find(t => t.id == id);
+                if (todo) {
+                    hideDayPopover();
+                    openEditModal(todo);
+                }
+            });
+        });
+
+        // 팝오버 위치 계산 (뷰포트 오버플로 방지)
+        const rect = cell.getBoundingClientRect();
+        const popoverWidth = 320;
+        const popoverHeight = 320;
+
+        let left = rect.left + (rect.width / 2) - (popoverWidth / 2);
+        left = Math.max(12, Math.min(window.innerWidth - popoverWidth - 12, left));
+
+        let top = rect.bottom + 8;
+        if (top + popoverHeight > window.innerHeight) {
+            top = Math.max(10, rect.top - popoverHeight - 8);
+        }
+
+        elements.calDayPopover.style.left = `${left}px`;
+        elements.calDayPopover.style.top = `${top}px`;
+        elements.calDayPopover.style.display = 'flex';
+    }
+
+    function hideDayPopover() {
+        clearTimeout(popoverShowTimer);
+        if (elements.calDayPopover) {
+            elements.calDayPopover.style.display = 'none';
+        }
+        currentPopoverDate = null;
     }
 
     // Add Todo Handler

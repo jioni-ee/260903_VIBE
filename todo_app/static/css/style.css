@@ -1513,9 +1513,221 @@ body {
     transition: var(--transition-fast);
 }
 
-.btn-clear-date-filter:hover {
-    background: rgba(239, 68, 68, 0.3);
-    color: #fca5a5;
+/* ==========================================================================
+   Day Details Popover (Full Items Overlay)
+   ========================================================================== */
+.cal-day-popover {
+    position: fixed;
+    z-index: 150;
+    width: 320px;
+    max-width: 90vw;
+    background: rgba(15, 22, 38, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-md);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 20px rgba(99, 102, 241, 0.2);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    pointer-events: auto;
+    animation: popoverFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform-origin: top center;
+}
+
+@keyframes popoverFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.popover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 0.6rem;
+}
+
+.popover-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.popover-cal-icon {
+    color: var(--primary);
+    font-size: 0.95rem;
+}
+
+.popover-date-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+}
+
+.popover-badge {
+    font-size: 0.7rem;
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+    padding: 0.1rem 0.45rem;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+}
+
+.btn-close-popover {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0.2rem 0.35rem;
+    border-radius: 4px;
+    transition: var(--transition-fast);
+}
+
+.btn-close-popover:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.popover-body {
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding-right: 0.2rem;
+}
+
+/* Custom Scrollbar for Popover */
+.popover-body::-webkit-scrollbar {
+    width: 4px;
+}
+.popover-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+.popover-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+.popover-section-title {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.popover-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.popover-item {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.popover-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(99, 102, 241, 0.4);
+    transform: translateX(2px);
+}
+
+.popover-item-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
+    flex: 1;
+}
+
+.popover-item-color-bar {
+    width: 3px;
+    height: 18px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.popover-item-title {
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.popover-item-meta {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+}
+
+.popover-item.is-completed .popover-item-title {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
+.popover-empty-notice {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 1rem 0;
+}
+
+.popover-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 0.6rem;
+}
+
+.btn-popover-add {
+    width: 100%;
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px dashed rgba(99, 102, 241, 0.4);
+    color: #a5b4fc;
+    padding: 0.45rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transition: var(--transition-fast);
+}
+
+.btn-popover-add:hover {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    border-style: solid;
 }
 
 /* Responsive Breakpoints */

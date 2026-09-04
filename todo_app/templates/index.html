@@ -103,6 +103,29 @@
                     </button>
                 </div>
             </div>
+
+            <!-- Floating Day Details Popover (Full items overlay) -->
+            <div class="cal-day-popover glass-card" id="calDayPopover" style="display: none;" role="dialog" aria-modal="false">
+                <div class="popover-header">
+                    <div class="popover-title-row">
+                        <i class="fa-regular fa-calendar-day popover-cal-icon"></i>
+                        <span class="popover-date-title" id="popoverDateTitle">2026년 9월 4일</span>
+                        <span class="popover-badge" id="popoverTotalBadge">0건</span>
+                    </div>
+                    <button type="button" class="btn-close-popover" id="btnClosePopover" title="닫기">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+                <div class="popover-body" id="popoverBody">
+                    <!-- Dynamic Popover items (schedules & todos) -->
+                </div>
+                <div class="popover-footer">
+                    <button type="button" class="btn-popover-add" id="btnPopoverAddSchedule">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                        <span>이 날짜에 일정 추가</span>
+                    </button>
+                </div>
+            </div>
         </section>
 
         <!-- Stats Overview Cards (Below Calendar) -->
@@ -242,13 +265,13 @@
 
                     <div class="toolbar-controls">
                         <div class="status-tabs" id="statusTabs">
-                            <button type="button" class="tab-btn active" data-filter="all">
+                            <button type="button" class="tab-btn active" data-filter="all" title="더블클릭: '오늘' 날짜 필터 토글">
                                 전체 <span class="tab-count" id="countAll">0</span>
                             </button>
-                            <button type="button" class="tab-btn" data-filter="active">
+                            <button type="button" class="tab-btn" data-filter="active" title="더블클릭: '오늘' 날짜 필터 토글">
                                 진행 중 <span class="tab-count" id="countActive">0</span>
                             </button>
-                            <button type="button" class="tab-btn" data-filter="completed">
+                            <button type="button" class="tab-btn" data-filter="completed" title="더블클릭: '오늘' 날짜 필터 토글">
                                 완료됨 <span class="tab-count" id="countCompleted">0</span>
                             </button>
                         </div>
