@@ -35,3 +35,8 @@ ENV/
 
 # Local DB
 todo_app/todo.db
+
+# Environment & Temp
+.env
+.vercel/
+deploy_pkg/

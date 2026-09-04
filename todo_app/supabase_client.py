@@ -2,6 +2,22 @@ import os
 from datetime import datetime, date
 from supabase import create_client, Client
 
+# 로컬 .env 파일 자동 로드
+if not os.environ.get('SUPABASE_URL'):
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        for cand in [os.path.join(base_dir, '.env'), os.path.join(base_dir, '..', '.env')]:
+            if os.path.exists(cand):
+                with open(cand, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            k, v = line.split('=', 1)
+                            os.environ[k.strip()] = v.strip()
+                break
+    except Exception:
+        pass
+
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip()
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '').strip()
 
@@ -10,15 +26,19 @@ _supabase: Client = None
 def get_supabase() -> Client:
     """Supabase 클라이언트 인스턴스 반환 (환경변수가 있을 경우)"""
     global _supabase
-    if not SUPABASE_URL or not SUPABASE_KEY:
+    url = os.environ.get('SUPABASE_URL', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
+    if not url or not key:
         return None
     if _supabase is None:
-        _supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        _supabase = create_client(url, key)
     return _supabase
 
 def is_supabase_enabled() -> bool:
     """Supabase 사용 가능 여부 확인"""
-    return bool(SUPABASE_URL and SUPABASE_KEY)
+    url = os.environ.get('SUPABASE_URL', '').strip()
+    key = os.environ.get('SUPABASE_KEY', '').strip()
+    return bool(url and key)
 
 
 def get_todos(filter_status='all', category='', priority='', search='', sort_by='created_desc'):
